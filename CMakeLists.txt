@@ -17,6 +17,11 @@ find_package(OpenCV REQUIRED)
 include_directories(${OpenCV_INCLUDE_DIRS})
 # !OpenCV
 
+# RealSense
+find_package(realsense2 REQUIRED)
+include_directories(${realsense2_INCLUDE_DIR})
+# !RealSense
+
 set(PROJECT_SOURCES
     main.cpp
 
@@ -25,4 +30,4 @@ set(PROJECT_SOURCES
 )
 
 add_executable(Yolov8CPPInference ${PROJECT_SOURCES})
-target_link_libraries(Yolov8CPPInference ${OpenCV_LIBS})
+target_link_libraries(Yolov8CPPInference ${OpenCV_LIBS} ${realsense2_LIBRARY})

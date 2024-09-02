@@ -3,6 +3,7 @@
 #include <getopt.h>
 
 #include <opencv2/opencv.hpp>
+#include <librealsense2/rs.hpp>
 
 #include "inference.h"
 
@@ -11,36 +12,29 @@ using namespace cv;
 
 int main(int argc, char **argv)
 {
-    std::string projectBasePath = "/home/.../yolov8_CPP_Inference_OpenCV_ONNX";
-    
+
     bool runOnGPU = true;
-
-    //
-    // Pass in either:
-    //
-    // "/source/models/yolov8s.onnx"
-    // or
-    // "/source/models/yolov5s.onnx"
-    //
-    // To run Inference with yolov8/yolov5 (ONNX)
-    //
     
-    Inference inf(projectBasePath + "/source/models/yolov8s.onnx", cv::Size(640, 480),
-                  projectBasePath + "/source/classes/classes.txt", runOnGPU);
+    Inference inf("../source/models/yolov5s.onnx", cv::Size(640, 480),
+                  "../source/classes/classes.txt", runOnGPU);
 
-    std::vector<std::string> imageNames;
-    imageNames.push_back(projectBasePath + "/source/data/bus.jpg");
-    imageNames.push_back(projectBasePath + "/source/data/zidane.jpg");
+    rs2::pipeline p;
+    rs2::config cfg;
 
-    for (int i = 0; i < imageNames.size(); ++i)
+    cfg.enable_stream(RS2_STREAM_COLOR, 640, 480, RS2_FORMAT_BGR8, 30);
+    p.start(cfg);
+
+    while (true)
     {
-        cv::Mat frame = cv::imread(imageNames[i]);
 
-        // Inference starts here...
+        rs2::frameset frames = p.wait_for_frames();
+        rs2::frame color_frame = frames.get_color_frame();
+
+        cv::Mat frame(Size(640, 480), CV_8UC3, const_cast<void *>(color_frame.get_data()), Mat::AUTO_STEP);
+
         std::vector<Detection> output = inf.runInference(frame);
 
         int detections = output.size();
-        std::cout << "Number of detections:" << detections << std::endl;
 
         for (int i = 0; i < detections; ++i)
         {
@@ -49,24 +43,23 @@ int main(int argc, char **argv)
             cv::Rect box = detection.box;
             cv::Scalar color = detection.color;
 
-            // Detection box
             cv::rectangle(frame, box, color, 2);
 
-            // Detection box text
             std::string classString = detection.className + ' ' + std::to_string(detection.confidence).substr(0, 4);
-            cv::Size textSize = cv::getTextSize(classString, cv::FONT_HERSHEY_DUPLEX, 1, 2, 0);
+            cv::Size textSize = cv::getTextSize(classString, cv::FONT_HERSHEY_DUPLEX, 1, 2, nullptr);
             cv::Rect textBox(box.x, box.y - 40, textSize.width + 10, textSize.height + 20);
 
             cv::rectangle(frame, textBox, color, cv::FILLED);
             cv::putText(frame, classString, cv::Point(box.x + 5, box.y - 10), cv::FONT_HERSHEY_DUPLEX, 1, cv::Scalar(0, 0, 0), 2, 0);
         }
-        // Inference ends here...
 
-        // This is only for preview purposes
         float scale = 0.8;
         cv::resize(frame, frame, cv::Size(frame.cols*scale, frame.rows*scale));
         cv::imshow("Inference", frame);
 
-        cv::waitKey(-1);
+        if (cv::waitKey(1) == 'q') break;
     }
+
+    p.stop();
+    return 0;
 }
